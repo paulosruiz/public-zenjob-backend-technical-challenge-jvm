@@ -1,24 +1,23 @@
 package com.zenjob.challenge.controller;
 
 import com.zenjob.challenge.dto.ResponseDto;
+import com.zenjob.challenge.entity.Job;
+import com.zenjob.challenge.entity.Shift;
 import com.zenjob.challenge.service.JobService;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Controller;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PatchMapping;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.ResponseBody;
-import org.springframework.web.bind.annotation.ResponseStatus;
+import org.springframework.web.bind.annotation.*;
 
 import javax.validation.Valid;
 import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
@@ -53,6 +52,37 @@ public class ShiftController {
         jobService.bookTalent(shiftId, dto.talent);
     }
 
+    //Task B
+    @DeleteMapping(path = "cancelShift/{jobId}")
+    public ResponseEntity<?> cancelShift(@PathVariable("jobId") UUID jobId,
+                                         @RequestParam(required = true, value = "shiftId") UUID shiftId) {
+        //Find Job
+        Optional<Job> jobList = jobService.getJobs(jobId);
+        if (jobList.isPresent()) {
+            jobService.deleteShift(shiftId);
+            return ResponseEntity.ok().body("Single Shift Cancelled");
+        }
+        return ResponseEntity.notFound().build();
+    }
+
+    //Task C
+    // Considering this as ShiftController  method since it can impact shifts cross jobs .
+    @DeleteMapping(path = "cancelAll/{talentId}/{replacementTalentId}")
+    @ResponseStatus(code = HttpStatus.NO_CONTENT)
+
+    public void cancelAll(@PathVariable("talentId") UUID talentId,@PathVariable("replacementTalentId") UUID replacementTalentId) {
+        List<Shift> shiftsPerTalent = jobService.getShiftsPerTalent(talentId);
+        if (!shiftsPerTalent.isEmpty()) {
+            for (Shift shift : shiftsPerTalent) {
+                // Will assume that since the current shift is been deleted
+                // it will create another shift for same job & same period but for another Talent.
+                jobService.replaceShift(replacementTalentId, shift.getId());
+            }
+
+        }
+    }
+
+
     @NoArgsConstructor
     @Data
     private static class BookTalentRequestDto {
@@ -68,9 +98,9 @@ public class ShiftController {
     @Builder
     @Data
     private static class ShiftResponse {
-        UUID    id;
-        UUID    talentId;
-        UUID    jobId;
+        UUID id;
+        UUID talentId;
+        UUID jobId;
         Instant start;
         Instant end;
     }
